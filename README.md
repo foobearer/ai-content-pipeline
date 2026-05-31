@@ -1,7 +1,7 @@
 # 🤖 Multi-Modal AI Content Analysis Pipeline
 
 > **Portfolio Project** by [Joycee Catamora Paragas](https://joycee.dev)  
-> Inspired by real-world AI content analysis work at Extreme Reach UK Ltd  
+> A production-grade multi-modal AI pipeline for automated content classification and search indexing 
 > **Stack:** Python · FastAPI · React · Vite · Tailwind CSS · OpenAI · Google Cloud · HuggingFace
 
 ---
