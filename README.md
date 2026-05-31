@@ -2,53 +2,22 @@
 
 > **Portfolio Project** by [Joycee Catamora Paragas](https://joycee.dev)  
 > Inspired by real-world AI content analysis work at Extreme Reach UK Ltd  
-> Built with Python · FastAPI · React · OpenAI · Google Cloud · HuggingFace
+> **Stack:** Python · FastAPI · React · Vite · Tailwind CSS · OpenAI · Google Cloud · HuggingFace
 
 ---
 
 ## What This Does
 
-This project is a **full-stack, multi-modal AI content analysis pipeline** that can automatically process:
+A full-stack AI pipeline that automatically analyses:
 
-| Input Type | What it extracts |
-|------------|-----------------|
-| 🖼️ **Images** | Objects, labels, text (OCR), dominant colours, scene classification |
-| 🎬 **Video** | Transcript, scene tags, content classification, key moments |
-| 📄 **Documents / Text** | Summary, keywords, sentiment, entities, language detection |
+| Input | What it extracts |
+|-------|-----------------|
+| 🖼️ **Images** | Labels, objects, OCR text, dominant colours, scene description |
+| 🎬 **Videos** | Full transcript, timestamped segments, tags, summary |
+| 📄 **Text / Docs** | Summary, sentiment, named entities, keywords, topics |
 
-It mirrors the kind of system used in production ad-tech and media platforms to automatically index, classify, and search large libraries of digital assets — removing the need for manual tagging.
-
-**Key achievement this replicates:** Search results delivered 40% faster by removing manual transcription and indexing.
-
----
-
-## Architecture Overview
-
-```
-┌─────────────────────────────────────────────────────┐
-│                   React Frontend                     │
-│         (Upload UI + Results Dashboard)              │
-└─────────────────┬───────────────────────────────────┘
-                  │ HTTP (multipart/form-data)
-┌─────────────────▼───────────────────────────────────┐
-│              FastAPI Backend (Python)                │
-│                                                      │
-│  ┌────────────┐  ┌──────────────┐  ┌─────────────┐  │
-│  │   Router   │  │  Processor   │  │   Storage   │  │
-│  │  /analyse  │→ │   Pipeline   │→ │  (Results)  │  │
-│  └────────────┘  └──────┬───────┘  └─────────────┘  │
-│                         │                            │
-│              ┌──────────▼──────────┐                 │
-│              │   Provider Factory  │                 │
-│              └──┬──────┬───────┬───┘                 │
-└─────────────────┼──────┼───────┼────────────────────┘
-                  │      │       │
-        ┌─────────▼┐ ┌───▼────┐ ┌▼──────────┐
-        │  OpenAI  │ │Google  │ │HuggingFace│
-        │ Vision + │ │Cloud   │ │(local,    │
-        │ Whisper  │ │Vision  │ │no key)    │
-        └──────────┘ └────────┘ └───────────┘
-```
+This replicates the system built at Extreme Reach UK that removed manual asset
+transcription and indexing — delivering search results **40% faster**.
 
 ---
 
@@ -56,132 +25,92 @@ It mirrors the kind of system used in production ad-tech and media platforms to 
 
 ```
 ai-content-pipeline/
+├── backend/                    ← Python / FastAPI
+│   ├── src/
+│   │   ├── main.py             ← App entry point, all routes
+│   │   ├── config.py           ← Settings from .env
+│   │   ├── providers/
+│   │   │   ├── base.py         ← Abstract interface all providers implement
+│   │   │   ├── __init__.py     ← Provider factory: get_provider(name)
+│   │   │   ├── openai_provider.py
+│   │   │   ├── google_provider.py
+│   │   │   └── huggingface_provider.py
+│   │   ├── models/
+│   │   │   └── schemas.py      ← All Pydantic request/response models
+│   │   └── utils/
+│   │       ├── file_handler.py ← Upload validation, temp storage, cleanup
+│   │       └── logger.py       ← Structured logging setup
+│   ├── requirements.txt
+│   └── .env.example
 │
-├── README.md                   ← You are here
-├── requirements.txt            ← Python dependencies
-├── .env.example                ← Environment variables template
-├── docker-compose.yml          ← Run everything with one command
-│
-├── src/
-│   ├── main.py                 ← FastAPI app entry point
-│   ├── config.py               ← Configuration & provider settings
-│   │
-│   ├── providers/              ← AI provider implementations
-│   │   ├── __init__.py
-│   │   ├── base.py             ← Abstract base class (interface)
-│   │   ├── openai_provider.py  ← OpenAI Vision + Whisper
-│   │   ├── google_provider.py  ← Google Cloud Vision + Speech
-│   │   └── huggingface_provider.py ← Local HuggingFace models
-│   │
-│   ├── processors/             ← Media type processors
-│   │   ├── __init__.py
-│   │   ├── image_processor.py  ← Image analysis pipeline
-│   │   ├── video_processor.py  ← Video analysis pipeline
-│   │   └── text_processor.py   ← Text/document analysis pipeline
-│   │
-│   ├── models/                 ← Pydantic data models
-│   │   ├── __init__.py
-│   │   └── schemas.py          ← Request/response schemas
-│   │
-│   └── utils/
-│       ├── __init__.py
-│       ├── file_handler.py     ← File validation & temp storage
-│       └── logger.py           ← Structured logging
-│
-├── frontend/
-│   ├── index.html              ← Single-file React app (no build needed)
-│   └── styles.css
+├── frontend/                   ← React / Vite / Tailwind
+│   ├── src/
+│   │   ├── main.tsx            ← React entry point
+│   │   ├── App.tsx             ← Root component, layout
+│   │   ├── components/
+│   │   │   ├── ProviderSelector.tsx   ← Provider switcher cards
+│   │   │   ├── DropZone.tsx           ← File drag-and-drop upload
+│   │   │   ├── AnalyseButton.tsx      ← Submit + loading state
+│   │   │   ├── ResultsPanel.tsx       ← Result router by content type
+│   │   │   ├── ImageResults.tsx       ← Image-specific result display
+│   │   │   ├── VideoResults.tsx       ← Video-specific result display
+│   │   │   ├── TextResults.tsx        ← Text-specific result display
+│   │   │   └── MetaCard.tsx           ← Job metadata display
+│   │   ├── hooks/
+│   │   │   └── useAnalysis.ts         ← API call logic, state management
+│   │   ├── types/
+│   │   │   └── api.ts                 ← TypeScript types mirroring backend schemas
+│   │   └── utils/
+│   │       └── api.ts                 ← fetch wrapper, endpoint constants
+│   ├── index.html
+│   ├── package.json
+│   ├── vite.config.ts
+│   ├── tailwind.config.ts
+│   ├── tsconfig.json
+│   └── postcss.config.js
 │
 ├── tests/
-│   ├── test_providers.py       ← Unit tests for each provider
-│   ├── test_processors.py      ← Integration tests
-│   └── conftest.py             ← Pytest fixtures
-│
+│   ├── test_providers.py
+│   └── conftest.py
 ├── docs/
-│   ├── SETUP.md                ← Detailed setup guide per provider
-│   ├── API.md                  ← API endpoint documentation
-│   └── ARCHITECTURE.md         ← Deep dive into design decisions
-│
-└── samples/                    ← Sample files to test with
-    ├── sample.jpg
-    ├── sample.txt
-    └── README.md
+│   └── SETUP.md
+├── docker-compose.yml
+└── .gitignore
 ```
 
 ---
 
 ## Quick Start
 
-### Option A — HuggingFace only (no API key needed, runs locally)
+### Backend
 
 ```bash
-# 1. Clone the repo
-git clone https://github.com/foobearer/ai-content-pipeline.git
-cd ai-content-pipeline
-
-# 2. Create a virtual environment
+cd backend
 python -m venv venv
-source venv/bin/activate        # Mac/Linux
-# venv\Scripts\activate         # Windows
-
-# 3. Install dependencies
+source venv/bin/activate        # Windows: venv\Scripts\activate
 pip install -r requirements.txt
-
-# 4. Copy environment file (no keys needed for HuggingFace)
-cp .env.example .env
-
-# 5. Start the server
+cp .env.example .env            # Edit with your API keys
 uvicorn src.main:app --reload
-
-# 6. Open your browser
-# API docs:     http://localhost:8000/docs
-# Frontend:     http://localhost:8000
+# API running at http://localhost:8000
+# Swagger docs at http://localhost:8000/docs
 ```
 
-### Option B — With OpenAI
+### Frontend
 
 ```bash
-# After step 4 above, edit .env and add:
-OPENAI_API_KEY=sk-your-key-here
-
-# Get your key at: https://platform.openai.com/api-keys
-# Free tier: $5 credit on signup
+cd frontend
+npm install
+npm run dev
+# UI running at http://localhost:5173
 ```
 
-### Option C — With Google Cloud
+### Docker (everything at once)
 
 ```bash
-# After step 4 above, add to .env:
-GOOGLE_APPLICATION_CREDENTIALS=./google-credentials.json
-
-# Setup guide: docs/SETUP.md#google-cloud
-```
-
-### Option D — Docker (easiest, everything included)
-
-```bash
-cp .env.example .env
-# Edit .env with your API keys
+cp backend/.env.example backend/.env
 docker-compose up
-# Visit http://localhost:8000
+# Visit http://localhost:5173
 ```
-
----
-
-## API Endpoints
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/` | Frontend UI |
-| `GET` | `/health` | Health check + provider status |
-| `GET` | `/providers` | List available providers |
-| `POST` | `/analyse/image` | Analyse an uploaded image |
-| `POST` | `/analyse/video` | Analyse a video (URL or upload) |
-| `POST` | `/analyse/text` | Analyse text or document |
-| `POST` | `/analyse/auto` | Auto-detect type and analyse |
-| `GET` | `/results/{job_id}` | Get analysis results by ID |
-
-Full API docs available at `http://localhost:8000/docs` (Swagger UI auto-generated).
 
 ---
 
@@ -189,43 +118,14 @@ Full API docs available at `http://localhost:8000/docs` (Swagger UI auto-generat
 
 | Feature | OpenAI | Google Cloud | HuggingFace |
 |---------|--------|--------------|-------------|
-| Image labels | ✅ GPT-4V | ✅ Vision API | ✅ BLIP/ViT |
-| OCR (text in images) | ✅ | ✅ | ✅ Tesseract |
+| Image analysis | ✅ GPT-4o Vision | ✅ Vision API | ✅ BLIP + ViT |
+| OCR | ✅ | ✅ | ✅ Tesseract |
 | Video transcript | ✅ Whisper | ✅ Speech-to-Text | ✅ Whisper local |
-| Text summary | ✅ GPT-4 | ✅ Natural Language | ✅ BART |
-| Sentiment | ✅ | ✅ | ✅ |
-| API key required | ✅ Yes | ✅ Yes | ❌ No |
-| Cost | Pay-per-use | Pay-per-use | Free (local) |
-| Speed | Fast | Fast | Slower (CPU) |
-| Best for | Quality | Google ecosystem | Privacy / offline |
+| Text analysis | ✅ GPT-4o-mini | ✅ Natural Language API | ✅ BART + RoBERTa |
+| API key needed | Yes | Yes | **No** |
+| Cost | Pay per use | Pay per use | **Free** |
+| Runs offline | No | No | **Yes** |
 
 ---
 
-## Tech Stack
-
-**Backend**
-- [FastAPI](https://fastapi.tiangolo.com/) — async Python web framework
-- [Pydantic](https://docs.pydantic.dev/) — data validation and schemas
-- [Uvicorn](https://www.uvicorn.org/) — ASGI server
-- [Pillow](https://pillow.readthedocs.io/) — image processing
-- [MoviePy](https://zulko.github.io/moviepy/) — video processing
-- [python-multipart](https://andrew-d.github.io/python-multipart/) — file uploads
-
-**AI Providers**
-- [OpenAI Python SDK](https://github.com/openai/openai-python) — GPT-4V, Whisper
-- [Google Cloud Client Libraries](https://cloud.google.com/python/docs/reference) — Vision, Speech, NL
-- [HuggingFace Transformers](https://huggingface.co/docs/transformers) — local models
-
-**Frontend**
-- Vanilla React (CDN, no build step) — keeps it simple to run
-- No framework dependencies — just open the HTML file
-
----
-
-## Licence
-
-MIT — free to use, modify, and share.
-
----
-
-*Built by Joycee Catamora Paragas · [joycee.dev](https://joycee.dev) · [github.com/foobearer](https://github.com/foobearer)*
+*Built by [Joycee Catamora Paragas](https://joycee.dev) · [github.com/foobearer](https://github.com/foobearer)*

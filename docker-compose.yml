@@ -1,28 +1,26 @@
-# docker-compose.yml — Run the full pipeline with one command
-#
-# Usage:
-#   docker-compose up          # Start everything
-#   docker-compose up --build  # Rebuild image first
-#   docker-compose down        # Stop and remove containers
-#
-# Then visit: http://localhost:8000
-
 version: "3.9"
 
 services:
-  api:
-    build: .
+  backend:
+    build: ./backend
     ports:
       - "8000:8000"
     volumes:
-      - ./src:/app/src              # Mount source for live reloading
-      - ./frontend:/app/frontend    # Mount frontend
-      - hf_cache:/root/.cache/huggingface  # Persist model downloads
+      - ./backend/src:/app/src
     env_file:
-      - .env
-    environment:
-      - TEMP_DIR=/tmp/ai_pipeline
+      - ./backend/.env
     command: uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload
 
+  frontend:
+    image: node:20-alpine
+    working_dir: /app
+    volumes:
+      - ./frontend:/app
+    ports:
+      - "5173:5173"
+    command: sh -c "npm install && npm run dev -- --host"
+    depends_on:
+      - backend
+
 volumes:
-  hf_cache:   # Named volume so HuggingFace models persist between container restarts
+  hf_cache:
