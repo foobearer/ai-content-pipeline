@@ -1,0 +1,43 @@
+# ── Core Framework ────────────────────────────────────────────────────────────
+fastapi==0.111.0          # Web framework — handles routing, validation, docs
+uvicorn[standard]==0.29.0 # ASGI server to run FastAPI
+python-multipart==0.0.9   # Required for file upload endpoints
+pydantic==2.7.1           # Data validation and schema definitions
+pydantic-settings==2.2.1  # Load settings from .env file
+
+# ── File Processing ────────────────────────────────────────────────────────────
+Pillow==10.3.0            # Image reading, resizing, format conversion
+python-magic==0.4.27      # Detect file type from content (not just extension)
+aiofiles==23.2.1          # Async file I/O for non-blocking uploads
+
+# ── Video Processing ───────────────────────────────────────────────────────────
+moviepy==1.0.3            # Extract audio from video files for transcription
+yt-dlp==2024.4.9          # Download video from URLs (YouTube, etc.)
+
+# ── AI Provider: OpenAI ───────────────────────────────────────────────────────
+openai==1.30.1            # OpenAI SDK — GPT-4 Vision, Whisper transcription
+
+# ── AI Provider: Google Cloud ─────────────────────────────────────────────────
+google-cloud-vision==3.7.2        # Image labelling, OCR, object detection
+google-cloud-speech==2.26.0       # Audio/video transcription
+google-cloud-language==2.13.3     # Text analysis — entities, sentiment, syntax
+
+# ── AI Provider: HuggingFace (local, no API key) ──────────────────────────────
+transformers==4.41.1      # Model hub — BART summarisation, sentiment, NER
+torch==2.3.0              # PyTorch backend for transformer models
+torchvision==0.18.0       # Vision model support
+pytesseract==0.3.10       # OCR wrapper (requires tesseract binary installed)
+sentencepiece==0.2.0      # Tokeniser used by some HuggingFace models
+
+# ── Utilities ─────────────────────────────────────────────────────────────────
+python-dotenv==1.0.1      # Load .env files into environment variables
+httpx==0.27.0             # Async HTTP client (used internally by OpenAI SDK)
+structlog==24.1.0         # Structured JSON logging — easier to parse in prod
+tenacity==8.3.0           # Retry logic with exponential backoff for API calls
+cachetools==5.3.3         # In-memory caching for repeated analyses
+
+# ── Testing ───────────────────────────────────────────────────────────────────
+pytest==8.2.0             # Test runner
+pytest-asyncio==0.23.6    # Async test support
+httpx==0.27.0             # Test client for FastAPI
+pytest-cov==5.0.0         # Code coverage reports

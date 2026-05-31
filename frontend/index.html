@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AI Content Analysis Pipeline</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet" />
+<script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0a0a0f; --surface: #111118; --surface2: #1a1a24; --border: #2a2a3a;
+    --accent: #00ff9d; --accent2: #7c6af7; --accent3: #ff9d00;
+    --text: #e8e8f0; --muted: #7a7a9a;
+    --mono: 'JetBrains Mono', monospace; --sans: 'Syne', sans-serif;
+  }
+  body { background: var(--bg); color: var(--text); font-family: var(--sans); min-height: 100vh; }
+  #root { max-width: 1100px; margin: 0 auto; padding: 2rem; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useCallback } = React;
+
+// ── Provider config ────────────────────────────────────────────────────────────
+const PROVIDERS = [
+  { id: "huggingface", label: "HuggingFace", color: "var(--accent)", note: "Local · No key needed · Free", desc: "BLIP + Whisper-base + BART + RoBERTa" },
+  { id: "openai",      label: "OpenAI",      color: "var(--accent2)", note: "Cloud · API key required",    desc: "GPT-4o Vision + Whisper-1" },
+  { id: "google",      label: "Google Cloud",color: "var(--accent3)", note: "Cloud · Credentials required", desc: "Vision API + Speech-to-Text + NL API" },
+];
+
+// ── Styles ─────────────────────────────────────────────────────────────────────
+const s = {
+  header: { borderBottom: "1px solid var(--border)", paddingBottom: "2rem", marginBottom: "2rem" },
+  title: { fontFamily: "var(--sans)", fontSize: "2rem", fontWeight: 800, letterSpacing: "-0.03em" },
+  accent: { color: "var(--accent)" },
+  subtitle: { fontFamily: "var(--mono)", fontSize: "0.8rem", color: "var(--muted)", marginTop: "0.5rem" },
+  label: { fontFamily: "var(--mono)", fontSize: "0.65rem", color: "var(--accent)", textTransform: "uppercase", letterSpacing: "0.15em", marginBottom: "0.75rem", display: "block" },
+  providerGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "1rem", marginBottom: "2rem" },
+  providerCard: (selected, color) => ({
+    background: selected ? "var(--surface2)" : "var(--surface)",
+    border: `1px solid ${selected ? color : "var(--border)"}`,
+    padding: "1rem 1.25rem", cursor: "pointer",
+    transition: "border-color 0.2s",
+  }),
+  providerName: (color) => ({ fontFamily: "var(--mono)", fontSize: "0.85rem", fontWeight: 700, color, marginBottom: "0.25rem" }),
+  providerNote: { fontFamily: "var(--mono)", fontSize: "0.65rem", color: "var(--muted)", marginBottom: "0.3rem" },
+  providerDesc: { fontFamily: "var(--mono)", fontSize: "0.65rem", color: "var(--muted)", opacity: 0.7 },
+  dropzone: (dragging) => ({
+    border: `2px dashed ${dragging ? "var(--accent)" : "var(--border)"}`,
+    background: dragging ? "rgba(0,255,157,0.03)" : "var(--surface)",
+    padding: "3rem 2rem", textAlign: "center", cursor: "pointer",
+    transition: "all 0.2s", marginBottom: "2rem",
+  }),
+  dropIcon: { fontSize: "2.5rem", marginBottom: "1rem", display: "block" },
+  dropText: { fontFamily: "var(--mono)", fontSize: "0.85rem", color: "var(--muted)", marginBottom: "0.5rem" },
+  dropSub: { fontFamily: "var(--mono)", fontSize: "0.7rem", color: "var(--muted)", opacity: 0.6 },
+  btn: (color) => ({
+    fontFamily: "var(--mono)", fontSize: "0.8rem", letterSpacing: "0.1em",
+    textTransform: "uppercase", padding: "0.75rem 2rem",
+    background: color || "var(--accent)", color: "#0a0a0f",
+    border: "none", cursor: "pointer", fontWeight: 700, width: "100%",
+    marginBottom: "2rem", opacity: 1, transition: "opacity 0.2s",
+  }),
+  btnDisabled: { opacity: 0.4, cursor: "not-allowed" },
+  resultCard: { background: "var(--surface)", border: "1px solid var(--border)", padding: "1.5rem", marginBottom: "1.5rem" },
+  resultTitle: { fontFamily: "var(--mono)", fontSize: "0.7rem", color: "var(--accent)", textTransform: "uppercase", letterSpacing: "0.15em", marginBottom: "1rem" },
+  tagList: { display: "flex", flexWrap: "wrap", gap: "0.4rem", marginTop: "0.5rem" },
+  tag: (color) => ({ fontFamily: "var(--mono)", fontSize: "0.65rem", padding: "0.25rem 0.6rem", background: "var(--surface2)", border: `1px solid ${color || "var(--border)"}`, color: color || "var(--muted)" }),
+  metaRow: { display: "flex", justifyContent: "space-between", fontFamily: "var(--mono)", fontSize: "0.7rem", color: "var(--muted)", marginBottom: "0.4rem" },
+  metaVal: { color: "var(--text)" },
+  progress: { fontFamily: "var(--mono)", fontSize: "0.8rem", color: "var(--muted)", textAlign: "center", padding: "2rem", background: "var(--surface)", border: "1px solid var(--border)" },
+  error: { fontFamily: "var(--mono)", fontSize: "0.8rem", color: "#ff6b6b", padding: "1rem 1.25rem", background: "rgba(255,107,107,0.08)", border: "1px solid rgba(255,107,107,0.3)", marginBottom: "1.5rem" },
+  sectionTitle: { fontSize: "1rem", fontWeight: 600, marginBottom: "0.75rem" },
+  prose: { fontFamily: "var(--mono)", fontSize: "0.8rem", color: "var(--muted)", lineHeight: 1.7 },
+  transcript: { fontFamily: "var(--mono)", fontSize: "0.75rem", color: "var(--muted)", lineHeight: 1.8, maxHeight: "200px", overflowY: "auto", background: "var(--surface2)", padding: "1rem", marginTop: "0.5rem" },
+  sentiment: (v) => ({ fontFamily: "var(--mono)", fontSize: "0.75rem", padding: "0.3rem 0.75rem", border: "1px solid", borderColor: v === "positive" ? "var(--accent)" : v === "negative" ? "#ff6b6b" : "var(--border)", color: v === "positive" ? "var(--accent)" : v === "negative" ? "#ff6b6b" : "var(--muted)", display: "inline-block" }),
+  colourSwatch: (hex) => ({ width: 24, height: 24, background: hex, border: "1px solid var(--border)", display: "inline-block", marginRight: 4, verticalAlign: "middle", title: hex }),
+};
+
+// ── Main App ───────────────────────────────────────────────────────────────────
+function App() {
+  const [provider, setProvider] = useState("huggingface");
+  const [file, setFile] = useState(null);
+  const [dragging, setDragging] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState(null);
+
+  const onDrop = useCallback((e) => {
+    e.preventDefault(); setDragging(false);
+    const f = e.dataTransfer?.files?.[0] || e.target.files?.[0];
+    if (f) { setFile(f); setResult(null); setError(null); }
+  }, []);
+
+  const analyse = async () => {
+    if (!file) return;
+    setLoading(true); setError(null); setResult(null);
+    const form = new FormData();
+    form.append("file", file);
+    form.append("provider", provider);
+    try {
+      const res = await fetch("/analyse/auto", { method: "POST", body: form });
+      if (!res.ok) { const e = await res.json(); throw new Error(e.detail || "Analysis failed"); }
+      setResult(await res.json());
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const selectedProvider = PROVIDERS.find(p => p.id === provider);
+
+  return (
+    <div>
+      <header style={s.header}>
+        <h1 style={s.title}>AI Content <span style={s.accent}>Analysis</span> Pipeline</h1>
+        <p style={s.subtitle}>Multi-modal · Image · Video · Text · Documents · Provider Switcher</p>
+        <p style={{...s.subtitle, marginTop: "0.25rem"}}>
+          Built by <a href="https://joycee.dev" style={{color:"var(--accent2)"}}>Joycee Catamora Paragas</a>
+          {" · "}
+          <a href="/docs" style={{color:"var(--muted)"}}>API Docs →</a>
+        </p>
+      </header>
+
+      {/* Provider Selection */}
+      <span style={s.label}>01 // Select AI Provider</span>
+      <div style={s.providerGrid}>
+        {PROVIDERS.map(p => (
+          <div key={p.id} style={s.providerCard(provider === p.id, p.color)} onClick={() => setProvider(p.id)}>
+            <div style={s.providerName(p.color)}>{p.label}</div>
+            <div style={s.providerNote}>{p.note}</div>
+            <div style={s.providerDesc}>{p.desc}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* File Drop Zone */}
+      <span style={s.label}>02 // Upload File</span>
+      <div
+        style={s.dropzone(dragging)}
+        onDragOver={e => { e.preventDefault(); setDragging(true); }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={onDrop}
+        onClick={() => document.getElementById("fileInput").click()}
+      >
+        <span style={s.dropIcon}>{file ? "📄" : "⬆"}</span>
+        <p style={s.dropText}>{file ? file.name : "Drop a file here, or click to browse"}</p>
+        <p style={s.dropSub}>Images · Videos · PDFs · Word docs · Text files · Max {50}MB</p>
+        <input id="fileInput" type="file" style={{display:"none"}} onChange={onDrop}
+          accept="image/*,video/*,.pdf,.doc,.docx,.txt" />
+      </div>
+
+      {/* Analyse Button */}
+      {error && <div style={s.error}>⚠ {error}</div>}
+      <button
+        style={file && !loading ? s.btn(selectedProvider?.color) : {...s.btn(), ...s.btnDisabled}}
+        onClick={analyse}
+        disabled={!file || loading}
+      >
+        {loading ? "Analysing..." : `Analyse with ${selectedProvider?.label}`}
+      </button>
+
+      {/* Results */}
+      {loading && (
+        <div style={s.progress}>
+          <div style={{marginBottom:"0.5rem"}}>⚙ Processing with {selectedProvider?.label}...</div>
+          <div style={{fontSize:"0.7rem", opacity:0.6}}>
+            {provider === "huggingface" ? "Loading local models (first run may take 30–60s)" : "Calling API..."}
+          </div>
+        </div>
+      )}
+
+      {result && <Results result={result} />}
+    </div>
+  );
+}
+
+// ── Results Component ──────────────────────────────────────────────────────────
+function Results({ result }) {
+  const img = result.image_analysis;
+  const vid = result.video_analysis;
+  const txt = result.text_analysis;
+  const prov = result.provider;
+  const provColor = PROVIDERS.find(p => p.id === prov.name)?.color || "var(--accent)";
+
+  return (
+    <div>
+      <span style={s.label}>03 // Analysis Results</span>
+
+      {/* Meta */}
+      <div style={s.resultCard}>
+        <div style={s.resultTitle}>Job Metadata</div>
+        {[
+          ["Job ID", result.job_id],
+          ["File", result.filename],
+          ["Content Type", result.content_type],
+          ["Provider", prov.name],
+          ["Model", prov.model_used],
+          ["Processing Time", `${prov.processing_time_ms}ms`],
+        ].map(([k, v]) => v && (
+          <div key={k} style={s.metaRow}>
+            <span>{k}</span><span style={{...s.metaVal, color: provColor}}>{v}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Image Results */}
+      {img && (
+        <>
+          {img.description && (
+            <div style={s.resultCard}>
+              <div style={s.resultTitle}>Description</div>
+              <p style={s.prose}>{img.description}</p>
+            </div>
+          )}
+          {img.labels?.length > 0 && (
+            <div style={s.resultCard}>
+              <div style={s.resultTitle}>Labels & Confidence</div>
+              {img.labels.map(l => (
+                <div key={l.name} style={{display:"flex", justifyContent:"space-between", fontFamily:"var(--mono)", fontSize:"0.75rem", color:"var(--muted)", marginBottom:"0.4rem"}}>
+                  <span>{l.name}</span>
+                  <span style={{color: provColor}}>{(l.confidence * 100).toFixed(1)}%</span>
+                </div>
+              ))}
+            </div>
+          )}
+          {img.extracted_text && (
+            <div style={s.resultCard}>
+              <div style={s.resultTitle}>Extracted Text (OCR)</div>
+              <div style={s.transcript}>{img.extracted_text}</div>
+            </div>
+          )}
+          {img.dominant_colours?.length > 0 && (
+            <div style={s.resultCard}>
+              <div style={s.resultTitle}>Dominant Colours</div>
+              <div style={{marginTop:"0.5rem"}}>
+                {img.dominant_colours.map(c => (
+                  <span key={c} title={c} style={{...s.colourSwatch(c), cursor:"default"}} />
+                ))}
+                <span style={{fontFamily:"var(--mono)", fontSize:"0.7rem", color:"var(--muted)", marginLeft:"0.5rem"}}>
+                  {img.dominant_colours.join("  ")}
+                </span>
+              </div>
+            </div>
+          )}
+          {img.tags?.length > 0 && (
+            <div style={s.resultCard}>
+              <div style={s.resultTitle}>Search Tags</div>
+              <div style={s.tagList}>{img.tags.map(t => <span key={t} style={s.tag(provColor)}>{t}</span>)}</div>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Video Results */}
+      {vid && (
+        <>
+          {vid.summary && (
+            <div style={s.resultCard}>
+              <div style={s.resultTitle}>Summary</div>
+              <p style={s.prose}>{vid.summary}</p>
+            </div>
+          )}
+          {vid.transcript && (
+            <div style={s.resultCard}>
+              <div style={s.resultTitle}>Transcript</div>
+              <div style={s.transcript}>{vid.transcript}</div>
+              {vid.transcript_segments?.length > 0 && (
+                <>
+                  <div style={{...s.resultTitle, marginTop:"1rem"}}>Timestamped Segments</div>
+                  {vid.transcript_segments.slice(0, 8).map((seg, i) => (
+                    <div key={i} style={{display:"flex", gap:"1rem", fontFamily:"var(--mono)", fontSize:"0.7rem", marginBottom:"0.4rem"}}>
+                      <span style={{color: provColor, minWidth:"80px"}}>{seg.start_seconds.toFixed(1)}s → {seg.end_seconds.toFixed(1)}s</span>
+                      <span style={{color:"var(--muted)"}}>{seg.text}</span>
+                    </div>
+                  ))}
+                </>
+              )}
+            </div>
+          )}
+          {vid.tags?.length > 0 && (
+            <div style={s.resultCard}>
+              <div style={s.resultTitle}>Search Tags</div>
+              <div style={s.tagList}>{vid.tags.map(t => <span key={t} style={s.tag(provColor)}>{t}</span>)}</div>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Text Results */}
+      {txt && (
+        <>
+          {txt.summary && (
+            <div style={s.resultCard}>
+              <div style={s.resultTitle}>Summary</div>
+              <p style={s.prose}>{txt.summary}</p>
+            </div>
+          )}
+          {txt.sentiment && (
+            <div style={s.resultCard}>
+              <div style={s.resultTitle}>Sentiment Analysis</div>
+              <div style={{marginBottom:"0.75rem"}}>
+                <span style={s.sentiment(txt.sentiment)}>{txt.sentiment}</span>
+                {txt.sentiment_score != null && (
+                  <span style={{fontFamily:"var(--mono)", fontSize:"0.7rem", color:"var(--muted)", marginLeft:"1rem"}}>
+                    Score: {txt.sentiment_score > 0 ? "+" : ""}{txt.sentiment_score?.toFixed(2)}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+          {txt.entities?.length > 0 && (
+            <div style={s.resultCard}>
+              <div style={s.resultTitle}>Named Entities</div>
+              <div style={s.tagList}>
+                {txt.entities.map(e => (
+                  <span key={e.text} style={{...s.tag(provColor), fontSize:"0.65rem"}}>
+                    <span style={{opacity:0.6}}>[{e.type}] </span>{e.text}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+          {txt.keywords?.length > 0 && (
+            <div style={s.resultCard}>
+              <div style={s.resultTitle}>Keywords</div>
+              <div style={s.tagList}>{txt.keywords.map(k => <span key={k} style={s.tag()}>{k}</span>)}</div>
+            </div>
+          )}
+          {txt.word_count && (
+            <div style={s.resultCard}>
+              <div style={s.metaRow}><span>Word Count</span><span style={{...s.metaVal, color: provColor}}>{txt.word_count.toLocaleString()}</span></div>
+              {txt.detected_language && <div style={s.metaRow}><span>Language</span><span style={{...s.metaVal, color: provColor}}>{txt.detected_language}</span></div>}
+              {txt.topics?.length > 0 && <div style={s.metaRow}><span>Topics</span><span style={{...s.metaVal, color: provColor}}>{txt.topics.join(", ")}</span></div>}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
