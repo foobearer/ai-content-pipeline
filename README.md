@@ -16,8 +16,6 @@ A full-stack AI pipeline that automatically analyses:
 | 🎬 **Videos** | Full transcript, timestamped segments, tags, summary |
 | 📄 **Text / Docs** | Summary, sentiment, named entities, keywords, topics |
 
-This replicates the system built at Extreme Reach UK that removed manual asset
-transcription and indexing — delivering search results **40% faster**.
 
 ![App Screenshot](ai-content-pipeline.png)
 
